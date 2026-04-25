@@ -28,6 +28,4 @@ class EKF:
 
         K = self.P @ H.T @ np.linalg.inv(S)
         self.x = self.x + K @ y
-        self.P = (np.eye(3) - K @ H) @ sPelf.P
-
-ekf = EKF()
+        self.P = (np.eye(3) - K @ H) @ self.P
