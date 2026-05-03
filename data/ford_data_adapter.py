@@ -7,9 +7,7 @@ def get_u(vx, vy, omega_z, dt):
     dx = vx * dt
     dy = vy * dt
     dtheta = omega_z * dt
-
     return np.array([dx, dy, dtheta])
-
 
 class FordDataAdapter:
     def __init__(self, bag_path: Path):
@@ -21,9 +19,6 @@ class FordDataAdapter:
 
     def __iter__(self):
         with Reader(self.bag_path) as reader:
-            for conn in reader.connections:
-                self.typestore.register(conn.msgtype)
-            
             for connection, timestamp, data in reader.messages():
                 msg = self.typestore.deserialize_ros1(data, connection.msgtype)
                 
