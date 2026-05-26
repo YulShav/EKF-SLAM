@@ -12,22 +12,31 @@ def get_u(vx, vy, omega_z, dt):
 class FordDataAdapter:
     def __init__(self, bag_path: Path):
         self.bag_path = Path(bag_path)
-        self.typestore = get_typestore(Stores.LATEST)
+        self.typestore = get_typestore(Stores.ROS1_NOETIC)
         self.last_vx = None
         self.last_vy = None
         self.last_ts = None
 
     def __iter__(self):
         with Reader(self.bag_path) as reader:
+            v_topic = "/velocity_raw"
+            imu_topic = "/imu"
+            raw_pose_topic = "/pose_raw"
+            gt_pose_topic = "/pose_ground_truth"
+
+            wanted_topics = {v_topic, imu_topic, raw_pose_topic, gt_pose_topic}
+
             for connection, timestamp, data in reader.messages():
+                if connection.topic not in wanted_topics:
+                    continue
+
                 msg = self.typestore.deserialize_ros1(data, connection.msgtype)
                 
-                if connection.topic == '/velocity_raw':
+                if connection.topic == v_topic:
                     self.last_vx = msg.vector.x
                     self.last_vy = msg.vector.y
-                    self.last_ts = timestamp
                 
-                elif connection.topic == '/imu':
+                elif connection.topic == imu_topic:
                     omega_z = msg.angular_velocity.z
                     
                     if self.last_ts is not None and self.last_vx is not None:
@@ -37,8 +46,15 @@ class FordDataAdapter:
                     
                     self.last_ts = timestamp
                 
-                elif connection.topic == '/pose_ground_truth':
+                elif connection.topic == raw_pose_topic:
                     x = msg.pose.position.x
                     y = msg.pose.position.y
                     z = np.array([x, y, 0.0])
                     yield 'update', z, timestamp
+
+                elif connection.topic == gt_pose_topic:
+                    x = msg.pose.position.x
+                    y = msg.pose.position.y
+                    z = np.array([x, y, 0.0])
+                    yield 'ground_truth', z, timestamp
+
