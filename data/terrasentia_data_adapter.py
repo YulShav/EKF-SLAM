@@ -19,7 +19,6 @@ class TerrasentiaDataAdapter:
 
     def __iter__(self):
         with Reader(self.bag_path) as reader:
-            # Топики как в вашем баге
             odom_topic = "/zed2_front/zed_node/odom"
             imu_topic = "/terrasentia/imu"
             path_map_topic = "/zed2_front/zed_node/path_map"
@@ -31,21 +30,17 @@ class TerrasentiaDataAdapter:
                     continue
 
                 msg = self.typestore.deserialize_ros1(data, connection.msgtype)
-                
-                # ===== 1. Одометрия (как источник скорости для predict) =====
+
                 if connection.topic == odom_topic:
-                    # Сохраняем скорость из одометрии
+
                     self.last_vx = msg.twist.twist.linear.x
                     self.last_vy = msg.twist.twist.linear.y
-                    
-                    # ИСПОЛЬЗУЕМ ОДОМЕТРИЮ КАК UPDATE (как в Ford использовали pose_raw)
-                    # Но с выравниванием по первой точке ground truth
+
                     x = msg.pose.pose.position.x
                     y = msg.pose.pose.position.y
                     z = np.array([x, y, 0.0])
                     yield 'update', z, timestamp
-                
-                # ===== 2. IMU (для predict) =====
+
                 elif connection.topic == imu_topic:
                     omega_z = msg.angular_velocity.z
                     
@@ -56,7 +51,6 @@ class TerrasentiaDataAdapter:
                     
                     self.last_ts = timestamp
                 
-                # ===== 3. Path Map (как ground truth) =====
                 elif connection.topic == path_map_topic:
                     if len(msg.poses) > 0:
                         last_pose = msg.poses[-1]
