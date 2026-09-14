@@ -5,7 +5,7 @@ class EKF:
         self.x = np.zeros(3)  # [x, y, theta]
         self.P = np.eye(3) * 0.1
         self.Q = np.eye(3) * 0.05
-        self.Q[2, 2] = 0.01  # Угловой шум меньше
+        self.Q[2, 2] = 0.01 
         self.R = np.eye(3) * 0.3
 
     def predict(self, u):
@@ -14,16 +14,13 @@ class EKF:
         """
         dx, dy, dtheta = u
         theta = self.x[2]
-        
-        # Правильная кинематическая модель
+
         self.x[0] += dx * np.cos(theta) - dy * np.sin(theta)
         self.x[1] += dx * np.sin(theta) + dy * np.cos(theta)
         self.x[2] += dtheta
-        
-        # Нормализуем угол
+
         self.x[2] = np.arctan2(np.sin(self.x[2]), np.cos(self.x[2]))
-        
-        # Якобиан
+
         cos_t = np.cos(theta)
         sin_t = np.sin(theta)
         
@@ -40,20 +37,11 @@ class EKF:
         if len(z) == 2:
             z = np.array([z[0], z[1], self.x[2]])
         
-        # Обновляем только x, y (НЕ угол!)
-        H = np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 0]   # ← НЕ обновляем угол
-        ])
-        
+        H = np.eye(3)
         y = z - self.x
-        y[2] = 0.0  # Игнорируем разницу по углу
+        y[2] = np.arctan2(np.sin(y[2]), np.cos(y[2]))
         
-        R_modified = self.R.copy()
-        R_modified[2, 2] = 1e9  # Огромный шум для угла
-        
-        S = H @ self.P @ H.T + R_modified
+        S = H @ self.P @ H.T + self.R
         K = self.P @ H.T @ np.linalg.inv(S)
         
         self.x = self.x + K @ y

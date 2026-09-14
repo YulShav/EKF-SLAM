@@ -25,14 +25,12 @@ initial_pose_set = False
 estimations = []
 ground_truth = []
 
-# Диагностика данных
 counts = {'predict': 0, 'update': 0, 'ground_truth': 0}
 first_timestamps = {}
 last_timestamps = {}
 dt_values = []
 
 for action, value, timestamp in adapter:
-    # Сбор диагностики
     counts[action] = counts.get(action, 0) + 1
     
     if action not in first_timestamps:
@@ -40,9 +38,8 @@ for action, value, timestamp in adapter:
     last_timestamps[action] = timestamp
     
     if action == 'predict':
-        dt_values.append(abs(value[0]) + abs(value[1]))  # Сумма приращений
-    
-    # ===== ОСНОВНАЯ ЛОГИКА =====
+        dt_values.append(abs(value[0]) + abs(value[1]))  #Сумма приращений
+
     if action == 'predict':
         if initial_pose_set:
             ekf.predict(value)
@@ -58,18 +55,6 @@ for action, value, timestamp in adapter:
     elif action == 'ground_truth':
         ground_truth.append(value[:2].copy())
 
-print("=== ДИАГНОСТИКА ===")
-for action, count in counts.items():
-    print(f"{action}: {count} сообщений")
-    if action in first_timestamps:
-        print(f"  Первое: {first_timestamps[action]/1e9:.3f} сек")
-        print(f"  Последнее: {last_timestamps[action]/1e9:.3f} сек")
-
-if dt_values:
-    print(f"\nСреднее приращение predict: {np.mean(dt_values):.6f}")
-    print(f"Максимальное приращение: {np.max(dt_values):.6f}")
-    print(f"Минимальное приращение: {np.min(dt_values):.6f}")
-
 estimations = np.array(estimations)
 ground_truth = np.array(ground_truth)
 
@@ -81,7 +66,7 @@ if len(estimations) == 0:
     exit()
 
 if len(ground_truth) == 0:
-    print("Нет данных Ground Truth!")
+    print("Нет данных Ground Truth")
     exit()
 
 offset_x = ground_truth[0, 0] - estimations[0, 0]
@@ -114,5 +99,5 @@ plt.title(f'Ошибка EKF (средняя: {np.mean(error):.2f} м, макс:
 plt.grid(True)
 
 plt.tight_layout()
-# plt.savefig(Path("results") / 'citrus_ekf_result.png', dpi=150)
+plt.savefig(Path("results") / 'citrus_ekf_result.png', dpi=150)
 plt.show()
