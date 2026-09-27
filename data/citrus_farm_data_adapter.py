@@ -16,13 +16,14 @@ def quaternion_to_yaw(qx, qy, qz, qw):
     return math.atan2(siny_cosp, cosy_cosp)
 
 class CitrusFarmDataAdapter:
-    def __init__(self, bag_path: Path):
+    def __init__(self, bag_path: Path, use_every_n_rtk: int = 5):
         self.bag_path = Path(bag_path)
         self.typestore = get_typestore(Stores.ROS1_NOETIC)
+        self.use_every_n_rtk = use_every_n_rtk
 
-        self.last_vx = 0.0
-        self.last_vy = 0.0
-        self.last_imu_ts = None
+        self.last_odom_ts = None
+        self.last_omega_z = 0.0
+        self.rtk_counter = 0
 
         self.first_odom = None
         self.first_gt = None
@@ -46,47 +47,30 @@ class CitrusFarmDataAdapter:
 
                 if connection.topic == odom_topic:
                     try:
-                        x = msg.pose.pose.position.x
-                        y = msg.pose.pose.position.y
-                        
-                        qx = msg.pose.pose.orientation.x
-                        qy = msg.pose.pose.orientation.y
-                        qz = msg.pose.pose.orientation.z
-                        qw = msg.pose.pose.orientation.w
-                        theta = quaternion_to_yaw(qx, qy, qz, qw)
+                        vx = msg.twist.twist.linear.x
+                        vy = msg.twist.twist.linear.y
 
                         if self.first_odom is None:
+                            x = msg.pose.pose.position.x
+                            y = msg.pose.pose.position.y
                             self.first_odom = np.array([x, y])
                         
-                        z = np.array([x, y, theta])
-                        yield 'update', z, timestamp
+                        if self.last_odom_ts is not None:
+                            dt = (timestamp - self.last_odom_ts) / 1e9
+                            if 0 < dt < 0.1:
+                                u = get_u(vx, vy, self.last_omega_z, dt)
+                                yield 'predict', u, timestamp
                         
-                    except Exception:
+                        self.last_odom_ts = timestamp
+                        
+                    except Exception as e:
                         continue
 
                 elif connection.topic == imu_topic:
                     try:
-                        omega_z = msg.angular_velocity.z
-                        ax = msg.linear_acceleration.x
-                        ay = msg.linear_acceleration.y
+                        self.last_omega_z = msg.angular_velocity.z
                         
-                        if self.last_imu_ts is not None:
-                            dt = (timestamp - self.last_imu_ts) / 1e9
-                            
-                            if 0 < dt < 0.1:
-                                self.last_vx += ax * dt
-                                self.last_vy += ay * dt
-
-                                MAX_SPEED = 5.0
-                                self.last_vx = np.clip(self.last_vx, -MAX_SPEED, MAX_SPEED)
-                                self.last_vy = np.clip(self.last_vy, -MAX_SPEED, MAX_SPEED)
-                                
-                                u = get_u(self.last_vx, self.last_vy, omega_z, dt)
-                                yield 'predict', u, timestamp
-                        
-                        self.last_imu_ts = timestamp
-                        
-                    except Exception:
+                    except Exception as e:
                         continue
 
                 elif connection.topic == gt_topic:
@@ -114,7 +98,13 @@ class CitrusFarmDataAdapter:
                             y_aligned = y
                         
                         z = np.array([x_aligned, y_aligned, theta])
-                        yield 'ground_truth', z, timestamp
+
+                        self.rtk_counter += 1
                         
-                    except Exception:
+                        if self.rtk_counter % self.use_every_n_rtk == 0:
+                            yield 'update', z, timestamp
+                        else:
+                            yield 'ground_truth', z, timestamp
+                        
+                    except Exception as e:
                         continue
