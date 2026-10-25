@@ -46,6 +46,13 @@ class CitrusFarmDataAdapter:
                     continue
 
                 if connection.topic == odom_topic:
+                    if self.first_odom is None:
+                        x = msg.pose.pose.position.x
+                        y = msg.pose.pose.position.y
+                        q = msg.pose.pose.orientation
+                        yaw = quaternion_to_yaw(q.x, q.y, q.z, q.w)
+                        self.first_odom = np.array([x, y])
+                        yield 'init', np.array([x, y, yaw]), timestamp
                     try:
                         vx = msg.twist.twist.linear.x
                         vy = msg.twist.twist.linear.y
@@ -86,6 +93,9 @@ class CitrusFarmDataAdapter:
 
                         if self.first_gt is None:
                             self.first_gt = np.array([x, y])
+
+                        if self.first_odom is None:
+                            continue 
                         
                         if self.first_odom is not None and self.first_gt is not None:
                             offset_x = self.first_odom[0] - self.first_gt[0]

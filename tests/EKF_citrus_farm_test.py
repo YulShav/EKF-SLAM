@@ -34,28 +34,54 @@ gt_y = []
 
 counts = {'predict': 0, 'update': 0, 'ground_truth': 0}
 
+# for action, value, timestamp in adapter:
+#     counts[action] = counts.get(action, 0) + 1
+    
+#     # if action == 'predict':
+#     #     if initial_pose_set:
+#     #         ekf.predict(value)
+#     if action == 'predict':
+#         if initial_pose_set:
+#             ekf.predict(value)
+#             est_times.append(timestamp)
+#             est_x.append(ekf.x[0]); est_y.append(ekf.x[1])
+
+#     elif action == 'update':
+#         if not initial_pose_set:
+#             ekf.set_pose(value)
+#             initial_pose_set = True
+#         else:
+#             ekf.update(value)
+
+#         est_times.append(timestamp)
+#         est_x.append(ekf.x[0])
+#         est_y.append(ekf.x[1])
+
+#     elif action == 'ground_truth':
+#         gt_times.append(timestamp)
+#         gt_x.append(value[0])
+#         gt_y.append(value[1])
+
 for action, value, timestamp in adapter:
     counts[action] = counts.get(action, 0) + 1
-    
-    if action == 'predict':
+
+    if action == 'init':
+        ekf.set_pose(value)
+        initial_pose_set = True
+        est_times.append(timestamp); est_x.append(ekf.x[0]); est_y.append(ekf.x[1])
+
+    elif action == 'predict':
         if initial_pose_set:
             ekf.predict(value)
+            est_times.append(timestamp); est_x.append(ekf.x[0]); est_y.append(ekf.x[1])
 
     elif action == 'update':
-        if not initial_pose_set:
-            ekf.set_pose(value)
-            initial_pose_set = True
-        else:
-            ekf.update(value)
-
-        est_times.append(timestamp)
-        est_x.append(ekf.x[0])
-        est_y.append(ekf.x[1])
+        if initial_pose_set:
+            ekf.update_pos(value[:2])
+            est_times.append(timestamp); est_x.append(ekf.x[0]); est_y.append(ekf.x[1])
 
     elif action == 'ground_truth':
-        gt_times.append(timestamp)
-        gt_x.append(value[0])
-        gt_y.append(value[1])
+        gt_times.append(timestamp); gt_x.append(value[0]); gt_y.append(value[1])
 
 print(f"Обработано: Predict={counts['predict']}, Update={counts['update']}, GT={counts['ground_truth']}")
 print(f"RTK использовано для update: {counts['update']} раз")
@@ -69,14 +95,14 @@ gt_times = np.array(gt_times)
 gt_x = np.array(gt_x)
 gt_y = np.array(gt_y)
 
-offset_x = gt_x[0] - est_x[0]
-offset_y = gt_y[0] - est_y[0]
+# offset_x = gt_x[0] - est_x[0]
+# offset_y = gt_y[0] - est_y[0]
 
-est_x_aligned = est_x + offset_x
-est_y_aligned = est_y + offset_y
+# est_x_aligned = est_x + offset_x
+# est_y_aligned = est_y + offset_y
 
-interp_x = interp1d(est_times, est_x_aligned, kind='linear', fill_value="extrapolate")
-interp_y = interp1d(est_times, est_y_aligned, kind='linear', fill_value="extrapolate")
+interp_x = interp1d(est_times, est_x, kind='linear', fill_value="extrapolate")
+interp_y = interp1d(est_times, est_y, kind='linear', fill_value="extrapolate")
 
 ekf_at_gt_x = interp_x(gt_times)
 ekf_at_gt_y = interp_y(gt_times)
@@ -95,7 +121,7 @@ plt.figure(figsize=(14, 6))
 
 plt.subplot(1, 2, 1)
 plt.plot(gt_x, gt_y, 'g-', linewidth=3, label='Ground Truth')
-plt.plot(est_x_aligned, est_y_aligned, 'b-', linewidth=2, label='EKF')
+plt.plot(est_x, est_y, 'b-', linewidth=2, label='EKF')
 
 plt.xlabel('X (м)')
 plt.ylabel('Y (м)')
@@ -108,6 +134,7 @@ plt.subplot(1, 2, 2)
 plt.plot(gt_times, error, 'r-', linewidth=2)
 plt.xlabel('Время (нс)')
 plt.ylabel('Ошибка (м)')
+
 plt.title(f'Ошибка EKF во времени\n(средняя: {np.mean(error):.3f} м, макс: {np.max(error):.3f} м)')
 plt.grid(True)
 
