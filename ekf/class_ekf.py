@@ -6,7 +6,7 @@ class EKF:
         self.P = np.eye(3) * 0.1
         self.Q = np.eye(3) * 0.05
         self.Q[2, 2] = 0.01 
-        self.R = np.eye(3) * 0.3
+        self.R = np.eye(3) * 5
 
     def predict(self, u):
         """
@@ -44,6 +44,18 @@ class EKF:
         S = H @ self.P @ H.T + self.R
         K = self.P @ H.T @ np.linalg.inv(S)
         
+        self.x = self.x + K @ y
+        self.x[2] = np.arctan2(np.sin(self.x[2]), np.cos(self.x[2]))
+        self.P = (np.eye(3) - K @ H) @ self.P
+
+    def update_pos(self, z):
+        z = np.asarray(z).flatten()[:2]
+        H = np.array([[1.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0]])
+        R = self.R[:2, :2]
+        y = z - H @ self.x
+        S = H @ self.P @ H.T + R
+        K = self.P @ H.T @ np.linalg.inv(S)
         self.x = self.x + K @ y
         self.x[2] = np.arctan2(np.sin(self.x[2]), np.cos(self.x[2]))
         self.P = (np.eye(3) - K @ H) @ self.P

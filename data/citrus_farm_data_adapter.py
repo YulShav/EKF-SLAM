@@ -110,11 +110,9 @@ class CitrusFarmDataAdapter:
                         z = np.array([x_aligned, y_aligned, theta])
 
                         self.rtk_counter += 1
-                        
+                        yield 'ground_truth', z, timestamp
                         if self.rtk_counter % self.use_every_n_rtk == 0:
                             yield 'update', z, timestamp
-                        else:
-                            yield 'ground_truth', z, timestamp
                         
                     except Exception as e:
                         continue
